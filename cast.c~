@@ -1,4 +1,4 @@
-//#pragma offload_attribute(push,target(mic))
+#pragma offload_attribute(push,target(mic))
 #include "cast.h"
 #include <math.h>
 #include <stdio.h>

@@ -1,4 +1,4 @@
-//#pragma offload_attribute(push,target(mic))
+#pragma offload_attribute(push,target(mic))
 #ifndef CAST_H
 #define  CAST_H
 #define PI 3.141592
