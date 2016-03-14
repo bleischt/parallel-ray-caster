@@ -319,7 +319,7 @@ void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int w
    double pixels_in_y = (max_y - min_y) / height;
    double pixels_in_x = (max_x - min_x) / width; 
 
-#pragma offload target(mic) in(eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y) in(spheres:length(num_spheres)) out(printSpheres:length(width*height*3))
+#pragma offload target(mic) in(eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y) nocopy(spheres) out(printSpheres:length(width*height*3))
 { 
    #pragma omp parallel for schedule(auto)
    for(int y = height; y > 0; --y) { 
