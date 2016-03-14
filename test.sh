@@ -1,6 +1,7 @@
 #!/bin/sh
 
 exe=./cast
+#&>/dev/null
 
 echo making...
 make 
@@ -9,9 +10,9 @@ make
 echo testing small bunny...
 if [ "$1" = "time" ]
 then
-   time $exe bunny_small.in &>/dev/null
+   time $exe bunny_small.in 
 else
-   $exe bunny_small.in &>/dev/null
+   $exe bunny_small.in 
 fi
 if ! diff -q image.ppm bunny_small.ppm
 then 
@@ -23,9 +24,9 @@ fi
 echo testing large bunny...
 if [ "$1" = "time" ]
 then
-   time $exe bunny_large.in &>/dev/null
+   time $exe bunny_large.in 
 else
-   $exe bunny_large.in &>/dev/null
+   $exe bunny_large.in 
 fi 
 if ! diff -q image.ppm bunny_large.ppm
 then 
@@ -36,9 +37,9 @@ fi
 echo testing dragon...
 if [ "$1" = "time" ]
 then
-   time $exe dragon.in &>/dev/null
+   time $exe dragon.in 
 else
-   $exe dragon.in &>/dev/null
+   $exe dragon.in 
 fi 
 if ! diff -q image.ppm dragon.ppm
 then 

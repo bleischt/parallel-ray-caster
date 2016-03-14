@@ -3,13 +3,13 @@
 exe=./cast
 
 echo making...
-make &>/dev/null
+make 
 
 
 echo testing small bunny...
 if [ "$1" = "time" ]
 then
-   time $exe bunny_small.in &>/dev/null
+   time $exe bunny_small.in #&>/dev/null
 else
    $exe bunny_small.in &>/dev/null
 fi

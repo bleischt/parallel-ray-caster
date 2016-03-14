@@ -1,4 +1,4 @@
-//#pragma offload_attribute(push,target(mic))
+#pragma offload_attribute(push,target(mic))
 #ifndef CAST_H
 #define  CAST_H
 #define PI 3.141592
@@ -106,4 +106,4 @@ int obscured_point(sphere spheres[], int num_spheres, ray light_ray, point inter
 color compute_ambience(sphere s, point intersect, color c, light light, sphere hit_sphere[], int num_spheres, point eye);
 void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int width, int height,point eye, int *printSpheres, sphere spheres[], int num_spheres, color color, light light);  
 #endif 
-//#pragma offload_attribute(pop)
+#pragma offload_attribute(pop)

@@ -71,13 +71,22 @@ int main(int argc, char *argv[])
    int height = 768;
    int *printSpheres = (int *)malloc(sizeof(int) * width * height * 3);
 
-   //#pragma offload target(mic)
-   //#pragma omp parallel for
-   //for (int i = 0; i < NUM_SPHERES * NUM_SPHERES; i++)
-   //{
-    //  printf("i like to have fun\n");
-   //}
-   
+/*
+   int *testValues = (int *) calloc(NUM_SPHERES, sizeof(int));
+
+   #pragma offload target(mic) inout(testValues:length(NUM_SPHERES))
+   #pragma omp parallel for
+   for (int i = 0; i < NUM_SPHERES; i++)
+   {
+      testValues[i] = 1;
+   }
+
+   for (int i = 0; i < NUM_SPHERES; i++)
+      if (testValues[i] < 1) {
+         printf("DIDN'T WORK, yo\n");
+         break;
+      }
+*/
 
    num_spheres = sphere_retriever(file, spheres);
 
@@ -91,6 +100,7 @@ int main(int argc, char *argv[])
       fprintf(out, "%d %d %d\n", printSpheres[x * 3], printSpheres[x * 3 + 1], printSpheres[x * 3 + 2]);
    }
    fclose(file);
+   fclose(out);
 
 
 

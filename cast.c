@@ -1,4 +1,4 @@
-//#pragma offload_attribute(push,target(mic))
+#pragma offload_attribute(push,target(mic))
 #include "cast.h"
 #include <math.h>
 #include <stdio.h>
@@ -6,11 +6,11 @@
 
 
 point create_point(double x, double y, double z) {
-   point p;
-   p.x = x;
-   p.y = y;
-   p.z = z;
-   return p;
+   point *p = (point*) malloc(sizeof(point));
+   p->x = x;
+   p->y = y;
+   p->z = z;
+   return *p;
 }
 
 vector create_vector(double x, double y, double z) {
@@ -80,20 +80,25 @@ flag create_flag(point eye, view view, light light, color ambient) {
    return f;
 }
 
-vector scale_vector(vector v, double scalar){
+/*
+vector scale_vector(vector v, double scalar)
+{
    return create_vector(v.x * scalar, v.y * scalar, v.z * scalar);
 }
+*/
 
 double dot_vector(vector v1, vector v2){
    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
+/*
 double length_vector(vector v){
    return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
+*/
 
 vector normalize_vector(vector v){
-   double length = length_vector(v);
+   double length = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);//length_vector(v);
    return create_vector(v.x/length, v.y/length, v.z/length);
 }
 
@@ -149,12 +154,15 @@ maybe_point sphere_intersection_point(ray r, sphere s){
    maybe_point intersect;
    ray scaled = r;
    quad = quad_form(r,s);
+
     if(discriminant(&r, &s) < 0 || (quad < 0)){
       intersect.isPoint = 0;
       return intersect;
    }else{
 /*Scaling the vector to meet the sphere. Translating the point according to the the scaled vector*/
-      scaled.dir = scale_vector(r.dir,quad);
+      scaled.dir.x *= quad;
+      scaled.dir.y *= quad;
+      scaled.dir.z *= quad; //= scale_vector(r.dir,quad);
       scaled.p = translate_point(scaled.p, scaled.dir);
       intersect.p = scaled.p;
       intersect.isPoint = 1;
@@ -203,7 +211,11 @@ color into_int(color d) {
 }
 
 double spec_intense(vector lightdir, double visible_light, point pointE, vector n, point eye) {
-   vector reflect = difference_vector(lightdir, scale_vector(n, 2 * visible_light));
+   double scalar = 2 * visible_light;
+   n.x *= scalar;
+   n.y *= scalar;
+   n.z *= scalar;
+   vector reflect = difference_vector(lightdir, n);//scale_vector(n, 2 * visible_light));
    vector Vdir = normalize_vector(difference_point(pointE, eye));
    double specular_intensity = dot_vector(reflect, Vdir);
    return specular_intensity;
@@ -225,7 +237,11 @@ int obscured_point(sphere spheres[], int num_spheres, ray light_ray, point inter
 }
 color compute_ambience(sphere s, point intersect, color c, light light, sphere hit_sphere[], int num_spheres, point eye) {
    vector n = sphere_normal_at_point(s.center, intersect);
-   point pointE = translate_point(intersect, scale_vector(n, .01));
+   vector newN;
+   newN.x = n.x *.01;
+   newN.y = n.y * .01;
+   newN.z = n.z * .01;
+   point pointE = translate_point(intersect, newN);//scale_vector(n, .01));
    vector lightdir = normalize_vector(difference_point(light.p, pointE)); 
    double visible_light = dot_vector(n, lightdir);
    ray lightray = create_ray(pointE, lightdir);
@@ -305,12 +321,30 @@ color cast_ray(ray r, sphere spheres[], int num_spheres, color color, light ligh
    return sphere_color;
 }
 
-//#pragma offload_attribute(pop)
-  
+#pragma offload_attribute(pop)
+
+
 void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int width, int height, point eye, int *printSpheres, sphere spheres[], int num_spheres, color color, light light) {
    int x, y;
    double pixels_in_y = (max_y - min_y) / height;
    double pixels_in_x = (max_x - min_x) / width; 
+
+/*
+#pragma offload target(mic) out(printSpheres:length(width*height/3))
+{
+   #pragma omp parallel for
+   for (int i = 0; i < width * height / 3; i++)
+   {
+      printSpheres[i] = 8;
+   }
+}
+
+
+for (int i = 0; i < width*height/3; i++)
+{
+   printf("%d\n", printSpheres[i]);
+}
+*/
 
 //#pragma offload target(mic) inout(spheres:length(num_spheres)) inout(printSpheres:length(width*height))
 //{ 
@@ -327,4 +361,53 @@ void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int w
    } 
 //}
 }
+ 
+/* 
+void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int width, int height, point eye, int *printSpheres, sphere spheres[], int num_spheres, color myColor, light light) {
+   int x, y;
+   double pixels_in_y = (max_y - min_y) / height;
+   double pixels_in_x = (max_x - min_x) / width; 
+
+   color colors[num_spheres];
+   point centers[num_spheres];
+   double radius[num_spheres];
+   finish finish[num_spheres];
+
+
+   #pragma omp parallel for
+   for (int i = 0; i < num_spheres; i++)
+   {
+      centers[i] = spheres[i].center;
+      radius[i] = spheres[i].radius;
+      colors[i] = spheres[i].color;
+      finish[i] = spheres[i].finish;
+   }
+
+#pragma offload target(mic) in(radius:length(num_spheres)) in(colors:length(num_spheres)) in(finish:length(num_spheres)) in(centers:length(num_spheres)) out(printSpheres:length(width*height))
+{ 
+   sphere spheresOffload[num_spheres];
+
+   #pragma omp parallel for
+   for (int i = 0; i < num_spheres; i++)
+   {
+      spheresOffload[i].center = centers[i];
+      spheresOffload[i].radius = radius[i];
+      spheresOffload[i].color = colors[i];
+      spheresOffload[i].finish = finish[i];
+   }
+
+   for(y = height; y > 0; --y) { 
+      
+      #pragma omp parallel for schedule(auto) 
+      for(x = 0; x < width; ++x) {
+         ray r = create_ray(eye, difference_point(create_point(x * pixels_in_x + min_x, y * pixels_in_y + min_y, 0), eye));
+         struct color sphere_color = into_int(cast_ray(r, spheresOffload, num_spheres, myColor, light, eye));
+         printSpheres[(height - y) *  width * 3 + x * 3] = (int)sphere_color.r;
+         printSpheres[(height - y) *  width * 3 + x * 3 + 1] = (int)sphere_color.g;
+         printSpheres[(height - y) *  width * 3 + x * 3 + 2] = (int)sphere_color.b;
+      }
+   } 
+}
+}
+*/
 
