@@ -60,6 +60,7 @@ int sphere_retriever(FILE* file, sphere spheres[])
 
 int main(int argc, char *argv[]) 
 {
+   
    FILE* file = open_file(argv[1]);
    FILE *out = fopen(OUTPUT_FILE, "w");
 

@@ -60,6 +60,7 @@ int sphere_retriever(FILE* file, sphere spheres[])
 
 int main(int argc, char *argv[]) 
 {
+   
    FILE* file = open_file(argv[1]);
    FILE *out = fopen(OUTPUT_FILE, "w");
 
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
    int height = 768;
    int *printSpheres = (int *)malloc(sizeof(int) * width * height * 3);
 
-
+/*
    int *testValues = (int *) calloc(NUM_SPHERES, sizeof(int));
 
    #pragma offload target(mic) inout(testValues:length(NUM_SPHERES))
@@ -86,11 +87,12 @@ int main(int argc, char *argv[])
          printf("DIDN'T WORK, yo\n");
          break;
       }
-
+*/
 
    num_spheres = sphere_retriever(file, spheres);
 
-   //#pragma offload target(mic) in(width, height) out(printSpheres:length(width*height)) 
+   #pragma offload_transfer target(mic) in(spheres:length(num_spheres)) 
+
    cast_all_rays(-10, 10, -7.5, 7.5, width, height, 
       create_point(0, 0, -14), printSpheres, spheres, num_spheres, create_color(1, 1, 1), create_light(create_point(-150, 50, -100), create_color(1.5, 1.5, 1.5)));
 
