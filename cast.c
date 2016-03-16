@@ -3,7 +3,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
+#define ALLOC alloc_if(1) free_if(0)
+#define REUSE alloc_if(0) free_if(0)
+#define FREE alloc_if(0) free_if(1)
 
 point create_point(double x, double y, double z) {
    point p;
@@ -27,6 +31,7 @@ ray create_ray(point p, vector dir) {
    r.dir = dir;
    return r;
 }
+
 sphere create_sphere(point center, double radius, color c, finish f) {
    sphere s;
    s.center = center;
@@ -215,19 +220,21 @@ double spec_intense(vector lightdir, double visible_light, point pointE, vector 
 }
 
 int obscured_point(sphere spheres[], int num_spheres, ray light_ray, point intersect) {
-   int i;
+   int result = 0;
    sphere hit_spheres[num_spheres];
    point intersections[num_spheres];
    int found_points = find_intersection_points(spheres, num_spheres, light_ray, hit_spheres, intersections);
    double obscure = distance_from(intersect, light_ray.p);
   
-   for(i = 0; i < found_points; ++i) {
+   #pragma omp parallel for
+   for(int i = 0; i < found_points; ++i) {
       if(obscure <= distance_from(intersections[i], intersect)) 
-         return 1;
+         result = 1;
    }
 
-   return 0;
+   return result;
 }
+
 color compute_ambience(sphere s, point intersect, color c, light light, sphere hit_sphere[], int num_spheres, point eye) {
    vector n = sphere_normal_at_point(s.center, intersect);
    point pointE = translate_point(intersect, scale_vector(n, .01));
@@ -285,27 +292,38 @@ color compute_ambience(sphere s, point intersect, color c, light light, sphere h
 }
 
 color cast_ray(ray r, sphere spheres[], int num_spheres, color color, light light, point eye) {                    
-   int i, retColoridx = 0;
+   int retColoridx = 0;
    struct color sphere_color = create_color(1, 1, 1);
    sphere hit_spheres[10000];
+
    point intersection_points[10000];
    int intersections = find_intersection_points(spheres, num_spheres, r, hit_spheres, intersection_points);
+   double distances[intersections];
  
    if(intersections > 0)
    {
       double closest_distance = distance_from(intersection_points[0], r.p);
       retColoridx = 0;
 
-      #pragma omp parallel for
-      for(i = 1; i < intersections; i++) 
+      #pragma omp parallel for shared(intersection_points, eye, distances)
+      for (int i = 1; i < intersections; i++)
       {
-         double current_distance = distance_from(intersection_points[i], eye);
-         
-         if(closest_distance > current_distance) {  
+         distances[i] = distance_from(intersection_points[i], eye);
+      }
+
+      #pragma omp parallel for //reduction(min: closest_distance)
+      for(int i = 1; i < intersections; i++) 
+      {
+        //double current_distance = distance_from(intersection_points[i], eye);
+         //if (current_distance != distances[i])
+         //   printf("cur: %f  dist: %f\n", current_distance, distances[i]);
+
+         if(distances[i] < closest_distance) {//current_distance) {  
             retColoridx = i;
-            closest_distance = current_distance;
+            closest_distance = distances[i];//current_distance;
          }
       }
+
       sphere_color = compute_ambience(hit_spheres[retColoridx], intersection_points[retColoridx], color, light, spheres, num_spheres, r.p);
    }
 
@@ -319,12 +337,13 @@ void cast_all_rays(double min_x, double max_x, double min_y, double max_y, int w
    double pixels_in_y = (max_y - min_y) / height;
    double pixels_in_x = (max_x - min_x) / width; 
 
-#pragma offload target(mic) in(eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y) in(spheres:length(num_spheres)) out(printSpheres:length(width*height*3))
+#pragma offload target(mic) in(eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y) in(spheres:length(num_spheres)) out(printSpheres:length(width*height*3)) 
 { 
-   #pragma omp parallel for schedule(auto)
+   
+   #pragma omp parallel for collapse(2) schedule(dynamic) shared(eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y, printSpheres, spheres)
    for(int y = height; y > 0; --y) { 
-      
-      #pragma omp parallel for schedule(auto)
+   //printf("num threads: %d\n", omp_get_num_threads());   
+      //#pragma omp parallel for schedule(auto)
       for(int x = 0; x < width; ++x) {
          ray r = create_ray(eye, difference_point(create_point(x * pixels_in_x + min_x, y * pixels_in_y + min_y, 0), eye));
          struct color sphere_color = into_int(cast_ray(r, spheres, num_spheres, color, light, eye));

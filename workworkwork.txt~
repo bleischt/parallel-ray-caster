@@ -1,0 +1,49 @@
+OFFLOAD OUTSIDE OF BOTH LOOPS
+testing small bunny...
+Run time of Ray Casting: 2.085 seconds
+testing large bunny...
+Run time of Ray Casting: 16.880 seconds
+testing dragon...
+Run time of Ray Casting: 10.933 seconds
+.
+
+
+REGULAR
+testing small bunny...
+Run time of Ray Casting: 1.346 seconds
+testing large bunny...
+Run time of Ray Casting: 6.308 seconds
+testing dragon...
+Run time of Ray Casting: 4.348 seconds
+
+
+OFFLOAD INNER LOOP
+testing small bunny...
+Run time of Ray Casting: 2.239 seconds
+real	0m7.649s
+user	0m2.004s
+sys	0m0.367s
+testing large bunny...
+Run time of Ray Casting: 16.941 seconds
+real	0m22.414s
+user	0m16.601s
+sys	0m0.456s
+testing dragon...
+Run time of Ray Casting: 10.945 seconds
+real	0m16.648s
+user	0m10.619s
+sys	0m0.445s
+
+//#pragma omp parallel for schedule(auto)
+   for(int y = height; y > 0; --y) { 
+      
+   #pragma offload target(mic) in(y, eye, light, color, num_spheres, height, width, pixels_in_x, pixels_in_y, min_x, min_y) nocopy(spheres[0:num_spheres] : REUSE) nocopy(printSpheres[0:width*height*3] : REUSE)
+      #pragma omp parallel for schedule(auto)
+      for(int x = 0; x < width; ++x) {
+         ray r = create_ray(eye, difference_point(create_point(x * pixels_in_x + min_x, y * pixels_in_y + min_y, 0), eye));
+         struct color sphere_color = into_int(cast_ray(r, spheres, num_spheres, color, light, eye));
+         printSpheres[(height - y) *  width * 3 + x * 3] = (int)sphere_color.r;
+         printSpheres[(height - y) *  width * 3 + x * 3 + 1] = (int)sphere_color.g;
+         printSpheres[(height - y) *  width * 3 + x * 3 + 2] = (int)sphere_color.b;
+      }
+   } 
